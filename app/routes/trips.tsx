@@ -1,0 +1,85 @@
+import { useState } from "react";
+import { Link } from "react-router";
+
+type Trip = {
+  id: number;
+  name: string;
+};
+
+export default function Trips() {
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [tripName, setTripName] = useState("");
+
+  function createTrip() {
+
+    setTrips([
+      ...trips,
+      {
+        id: Date.now(),
+        name: tripName.trim(),
+      },
+    ]);
+
+    setTripName("");
+    setShowForm(false);
+  }
+
+  return (
+    <main className="min-h-screen px-6 py-12">
+      <h1 className="mb-10 text-center text-5xl font-bold text-purple-700">
+        look forward
+      </h1>
+
+      <section className="mx-auto max-w-3xl">
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="mb-5 rounded-full bg-purple-600 px-5 py-2 text-white"
+        >
+          +
+        </button>
+
+        {showForm && (
+          <form onSubmit={createTrip} className="mb-5 flex gap-2">
+            <input
+              type="text"
+              value={tripName}
+              onChange={(event) => setTripName(event.target.value)}
+              placeholder="Trip name"
+              autoFocus
+              className="rounded-lg bg-white px-4 py-2"
+            />
+
+            <button
+              type="submit"
+              className="rounded-lg bg-purple-600 px-4 py-2 text-white"
+            >
+              Create
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="rounded-lg px-4 py-2"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
+
+        <div className="grid max-h-80 grid-cols-2 gap-5 overflow-y-auto md:grid-cols-4">
+          {trips.map((trip) => (
+            <Link
+              key={trip.id}
+              to={`/trips/${trip.name.split(" ").join("-")}`}
+              className="flex aspect-square items-center justify-center rounded-3xl bg-white/50"
+            >
+              {trip.name}
+            </Link>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
