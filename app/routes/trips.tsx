@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router";
 
+type Activity = {
+  id: number;
+  name: string;
+  location: string;
+  priceRange: string;
+  links: string;
+  notes: string;
+};
+
 type Trip = {
   id: number;
   name: string;
+  activities?: Activity[];
 };
 
 export default function Trips() {
