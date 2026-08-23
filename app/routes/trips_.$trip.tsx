@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useLocation } from "react-router";
+import { useParams, useLocation, Link } from "react-router";
 
 // Custom Activity type
 export default function TripPage() {
@@ -92,6 +92,12 @@ export default function TripPage() {
 
   return (
     <main className="min-h-screen px-6 py-12">
+      <Link
+        to="/trips"
+        className="mb-6 inline-flex items-center rounded-full bg-gray-400 px-4 py-2 text-white hover:bg-purple-700"
+      >
+        ← Back to trips
+      </Link>
       <h1 className="mb-10 text-center text-5xl font-bold text-purple-700">
         {tripName}
       </h1>
