@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { useParams } from "react-router";
+import { useEffect, useState } from "react";
+import { useParams, useLocation } from "react-router";
 
-
+// Custom Activity type
 export default function TripPage() {
-  const { trip } = useParams();
-    type Activity = {
+  type Activity = {
     id: number;
     name: string;
     location: string;
@@ -13,8 +12,31 @@ export default function TripPage() {
     notes: string;
   };
 
-  const [activities, setActivities] = useState<Activity[]>([]);
+  // Get trip ID from URL params
+  const { trip } = useParams();
+  if (!trip) return;
+  const tripId = parseInt(trip, 10);
 
+  // Get trip name from location state
+  const { state } = useLocation();
+  const tripName = state?.tripName || ""; 
+
+  // Load activities for trip
+  const [activities, setActivities] = useState<Activity[]>([]);
+  useEffect(() => {
+      async function loadActivities() {
+        const response = await fetch(
+          `http://localhost:8000/get_activities/${trip}`
+        );
+        const existingActivities = await response.json();
+
+        setActivities(existingActivities);
+      }
+  
+    loadActivities();
+  }, []);
+
+  // States for UI and form handling
   const [createActivityForm, setCreateActivityForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [activityName, setActivityName] = useState("");
@@ -23,11 +45,22 @@ export default function TripPage() {
   const [activityLinks, setActivityLinks] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
 
-  function createActivity() {
+  async function createActivity() {
+    const response = await fetch("http://localhost:8000/add_activity", {
+      method: "POST",
+      headers: {
+          "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: activityName.trim(), location: activityLocation.trim(), price_range: activityPriceRange || null, links: activityLinks.trim(), notes: activityNotes.trim(), trip_id: tripId })
+    });
+
+    const activity = await response.json();
+    console.log(activity);
+
     setActivities([
       ...activities,
       {
-        id: Date.now(),
+        id: activity.id,
         name: activityName.trim(),
         location: activityLocation.trim(),
         priceRange: activityPriceRange.trim(),
@@ -43,10 +76,24 @@ export default function TripPage() {
     setCreateActivityForm(false);
   }
 
+  // Get a specific activity by ID to display UI details
+  async function getActivity(id: number) {
+    const response = await fetch(
+      `http://localhost:8000/get_activity/${id}`
+    );
+
+    const activity = await response.json();
+
+    setSelectedActivity({
+      ...activity,
+      priceRange: activity.price_range,
+    });
+  }
+
   return (
     <main className="min-h-screen px-6 py-12">
       <h1 className="mb-10 text-center text-5xl font-bold text-purple-700">
-        {trip?.split("-").join(" ")}
+        {tripName}
       </h1>
 
       <section className="mx-auto max-w-3xl">
@@ -59,7 +106,7 @@ export default function TripPage() {
           onClick={() => setCreateActivityForm(true)}
           className="mb-5 rounded-full bg-purple-600 px-5 py-2 text-white hover:bg-purple-700"
         >
-          + Create event
+          + Add Activity
         </button>
 
         {createActivityForm && (
@@ -101,14 +148,23 @@ export default function TripPage() {
 
                 <label className="flex items-center gap-3">
                   <span className="w-28 text-purple-950">Price range:</span>
-                  <input
-                    type="text"
-                    value={activityPriceRange}
-                    onChange={(event) =>
-                      setActivityPriceRange(event.target.value)
-                    }
-                    className="flex-1 rounded-lg bg-white/50 px-3 py-2 outline-none"
-                  />
+
+                  <div className="flex gap-2">
+                    {["$", "$$", "$$$"].map((price) => (
+                      <button
+                        key={price}
+                        type="button"
+                        onClick={() => setActivityPriceRange(price)}
+                        className={`font-semibold transition ${
+                          activityPriceRange === price
+                            ? "text-purple-950"
+                            : "text-purple-500/50 hover:text-purple-700"
+                        }`}
+                      >
+                        {price}
+                      </button>
+                    ))}
+                  </div>
                 </label>
 
                 <label className="flex items-center gap-3">
@@ -147,7 +203,7 @@ export default function TripPage() {
             <button
               key={activity.id}
               type="button"
-              onClick={() => setSelectedActivity(activity)}
+              onClick={() => getActivity(activity.id)}
               className="flex aspect-square flex-col justify-center rounded-3xl bg-gray-300/70 p-4 text-left text-purple-900 transition hover:bg-gray-300"
             >
               <h3 className="text-lg font-semibold">{activity.name}</h3>
