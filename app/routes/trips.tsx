@@ -104,6 +104,7 @@ export default function Trips() {
             <Link
               key={trip.id}
               to={`/trips/${trip.id}`}
+              state={{ tripName: trip.name }}
               className="flex aspect-square items-center justify-center rounded-3xl bg-white/50"
             >
                 {trip.name}
