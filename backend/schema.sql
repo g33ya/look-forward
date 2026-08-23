@@ -15,3 +15,10 @@ CREATE TABLE activities (
     links VARCHAR(2048),
     notes TEXT
 )
+
+INSERT INTO trips (name) VALUES
+('Trip to Paris'),
+('Trip to New York'),
+('Trip to Tokyo');
+
+SELECT name FROM trips;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 type Activity = {
@@ -18,16 +18,37 @@ type Trip = {
 
 export default function Trips() {
   const [trips, setTrips] = useState<Trip[]>([]);
+
+  useEffect(() => {
+    async function loadTrips() {
+      const response = await fetch("http://localhost:8000/get_trips");
+      const existingTrips = await response.json();
+
+      setTrips(existingTrips);
+    }
+
+  loadTrips();
+  }, []);
+
   const [showForm, setShowForm] = useState(false);
   const [tripName, setTripName] = useState("");
 
-  function createTrip() {
-
+  async function asyncCreateTrip(tripName: string) {
+    const response = await fetch("http://localhost:8000/add_trip", {
+      method: "POST",
+      headers: {
+          "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: tripName.trim() })
+    });
+    const trip = await response.json();
+    console.log(trip);
+    
     setTrips([
       ...trips,
       {
-        id: Date.now(),
-        name: tripName.trim(),
+        id: trip.id,
+        name: trip.name,
       },
     ]);
 
@@ -51,7 +72,7 @@ export default function Trips() {
         </button>
 
         {showForm && (
-          <form onSubmit={createTrip} className="mb-5 flex gap-2">
+          <form onSubmit={() => asyncCreateTrip(tripName)} className="mb-5 flex gap-2">
             <input
               type="text"
               value={tripName}
