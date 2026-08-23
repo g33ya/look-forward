@@ -1,7 +1,12 @@
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import get_connection
+
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
 
 app = FastAPI()
@@ -25,7 +30,55 @@ app.add_middleware(
 async def read_root() -> dict:
     return {"message": "FastAPI is running!"}
 
+#                                     ---=== AUTH APIS ===---
 
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
+@app.post("/auth/google")
+async def google_login(data: dict):
+    credential = data["credential"]
+
+    try:
+        user_info = id_token.verify_oauth2_token(
+            credential,
+            requests.Request(),
+            GOOGLE_CLIENT_ID,
+        )
+
+        google_id = user_info["sub"]
+        email = user_info["email"]
+        name = user_info["name"]
+
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s) ON CONFLICT (google_id) DO NOTHING RETURNING id",
+                    (google_id, email, name),
+                )
+
+                result = cursor.fetchone()
+                if result is None:
+                    cursor.execute(
+                        "SELECT id FROM users WHERE google_id = %s",
+                        (google_id,),
+                    )
+                    result = cursor.fetchone()
+                user_id = result[0]
+
+                return {"user_id": user_id, "email": email, "name": name}
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Google credential",
+        )
+
+    return {
+        "google_id": user_info["sub"],
+        "email": user_info["email"],
+        "name": user_info["name"],
+    }
+    
 #                                  ---=== TRIPS TABLE APIS ===---
 
 # Get all trips

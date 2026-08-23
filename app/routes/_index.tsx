@@ -1,4 +1,5 @@
 import Trips from "./trips";
+import Landing from "./landing";
 
 export function meta() {
   return [
@@ -8,5 +9,5 @@ export function meta() {
 }
 
 export default function Home() {
-  return <Trips />;
+  return <Landing />;
 }
