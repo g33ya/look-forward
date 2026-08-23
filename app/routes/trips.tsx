@@ -103,10 +103,10 @@ export default function Trips() {
           {trips.map((trip) => (
             <Link
               key={trip.id}
-              to={`/trips/${trip.name.split(" ").join("-")}`}
+              to={`/trips/${trip.id}`}
               className="flex aspect-square items-center justify-center rounded-3xl bg-white/50"
             >
-              {trip.name}
+                {trip.name}
             </Link>
           ))}
         </div>
