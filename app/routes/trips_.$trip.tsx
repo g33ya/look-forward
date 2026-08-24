@@ -9,6 +9,8 @@ export default function TripPage() {
     id: number;
     name: string;
     location: string;
+    latitude: number | null;
+    longitude: number | null;
     priceRange: string;
     links: string;
     notes: string;
@@ -66,6 +68,20 @@ export default function TripPage() {
     loadTags();
   }, [selectedActivity]);
 
+  const [userLocation, setUserLocation] = useState<{latitude: number;longitude: number;} | null>(null);
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.error("Unable to retrieve location:", error);
+      }
+    );
+  }, []);
   // States for UI and form handling
   const [createActivityForm, setCreateActivityForm] = useState(false);
   const [activityName, setActivityName] = useState("");
@@ -82,7 +98,7 @@ export default function TripPage() {
       headers: {
           "Content-Type": "application/json"
       },
-      body: JSON.stringify({ name: activityName.trim(), location: activityLocation.trim(), latitude: latitude, logitude: longitude, price_range: activityPriceRange || null, links: activityLinks.trim(), notes: activityNotes.trim(), trip_id: tripId })
+      body: JSON.stringify({ name: activityName.trim(), location: activityLocation.trim(), latitude: latitude, longitude: longitude, price_range: activityPriceRange || null, links: activityLinks.trim(), notes: activityNotes.trim(), trip_id: tripId })
     });
 
     const activity = await response.json();
@@ -94,6 +110,8 @@ export default function TripPage() {
         id: activity.id,
         name: activityName.trim(),
         location: activityLocation.trim(),
+        latitude: latitude,
+        longitude: longitude,
         priceRange: activityPriceRange.trim(),
         links: activityLinks.trim(),
         notes: activityNotes.trim(),
@@ -151,6 +169,34 @@ export default function TripPage() {
     );
 
     setTagName("");
+  }
+
+  function calculateDistanceMiles(
+    latitude1: number,
+    longitude1: number,
+    latitude2: number,
+    longitude2: number
+  ) {
+    const earthRadiusMiles = 3958.8;
+
+    const toRadians = (degrees: number) => {
+      return (degrees * Math.PI) / 180;
+    };
+
+    const deltaLatitude = toRadians(latitude2 - latitude1);
+    const deltaLongitude = toRadians(longitude2 - longitude1);
+
+    const a =
+      Math.sin(deltaLatitude / 2) ** 2 +
+      Math.cos(toRadians(latitude1)) *
+        Math.cos(toRadians(latitude2)) *
+        Math.sin(deltaLongitude / 2) ** 2;
+
+    return (
+      earthRadiusMiles *
+      2 *
+      Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    );
   }
 
   return (
@@ -272,24 +318,53 @@ export default function TripPage() {
         )}
 
         <div className="grid max-h-105 grid-cols-2 gap-5 overflow-y-auto md:grid-cols-4">
-          {activities.map((activity) => (
-            <button
-              key={activity.id}
-              type="button"
-              onClick={() => getActivity(activity.id)}
-              className="flex aspect-square flex-col justify-center rounded-3xl bg-gray-300/70 p-4 text-left text-purple-900 transition hover:bg-gray-300"
-            >
-              <h3 className="text-lg font-semibold">{activity.name}</h3>
+          {activities.map((activity) => {
+            console.log({
+    activity: activity.name,
+    userLocation,
+    latitude: activity.latitude,
+    longitude: activity.longitude,
+  });
+            const distance =
+              userLocation &&
+              activity.latitude != null &&
+              activity.longitude != null
+                ? calculateDistanceMiles(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    activity.latitude,
+                    activity.longitude
+                  )
+                : null;
 
-              {activity.location && (
-                <p className="mt-2 text-sm">{activity.location}</p>
-              )}
+            return (
+              <button
+                key={activity.id}
+                type="button"
+                onClick={() => getActivity(activity.id)}
+                className="
+                  relative aspect-square w-44 overflow-hidden
+                  rounded-3xl border border-purple-300/30
+                  bg-white/40
+                "
+              >
+                {distance !== null && (
+                  <span
+                    className="
+                      absolute right-2 top-2 z-10
+                      rounded-full border border-white/20
+                      bg-[#181c2c]/70 px-3 py-1
+                      text-xs text-white backdrop-blur-md
+                    "
+                  >
+                    {distance.toFixed(1)} mi
+                  </span>
+                )}
 
-              {activity.priceRange && (
-                <p className="text-sm">{activity.priceRange}</p>
-              )}
-            </button>
-          ))}
+                <span>{activity.name}</span>
+              </button>
+            );
+          })}
         </div>
 
         {selectedActivity && (

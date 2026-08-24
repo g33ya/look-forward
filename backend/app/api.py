@@ -245,10 +245,10 @@ async def add_trip(request: Request, name: str = Form(...), image: UploadFile | 
 async def get_activities(trip_id: int):
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT id, name FROM activities WHERE trip_id = %s", (trip_id,))
+            cursor.execute("SELECT id, name, latitude, longitude FROM activities WHERE trip_id = %s", (trip_id,))
             activities = cursor.fetchall()
 
-    return [{"id": activity[0], "name": activity[1]} for activity in activities]
+    return [{"id": activity[0], "name": activity[1], "latitude": activity[2], "longitude": activity[3]} for activity in activities]
 
 # Fields of specific activity
 @app.get("/get_activity/{activity_id}")

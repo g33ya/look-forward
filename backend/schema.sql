@@ -51,6 +51,5 @@ CREATE TABLE activity_tags (
     PRIMARY KEY (activity_id, tag_id)
 );
 
-ALTER TABLE activities
-ADD COLUMN latitude DOUBLE PRECISION,
-ADD COLUMN longitude DOUBLE PRECISION;
+SELECT name, latitude, longitude
+FROM activities;
