@@ -23,6 +23,7 @@ CREATE TABLE trips (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL
+    image_url TEXT;
 );
 
 CREATE TABLE activities (
@@ -34,8 +35,3 @@ CREATE TABLE activities (
     links VARCHAR(2048),
     notes TEXT
 )
-
-SELECT * FROM users;
-
-SELECT name, profile_picture
-FROM users;

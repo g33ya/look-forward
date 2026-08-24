@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.database import get_connection
 
@@ -11,6 +12,15 @@ from google.oauth2 import id_token
 
 import hashlib
 import secrets
+
+from pathlib import Path
+from uuid import uuid4
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import File, Form, HTTPException, Request, UploadFile
+from fastapi.staticfiles import StaticFiles
+
 
 app = FastAPI()
 
@@ -171,10 +181,10 @@ async def get_trips(request: Request):
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT id, name FROM trips WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT id, name, image_url FROM trips WHERE user_id = %s", (user_id,))
             trips = cursor.fetchall()
 
-    return [{"id": trip[0], "name": trip[1]} for trip in trips]
+    return [{"id": trip[0], "name": trip[1], "image_url": trip[2]} for trip in trips]
 
 # Get a specific trip by ID
 @app.get("/get_trip/{trip_id}")
@@ -189,20 +199,43 @@ async def get_trip(trip_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Trip not found")
     return {"id": trip[0], "name": trip[1]}
 
+
+
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+async def save_trip_image(image: UploadFile) -> str:
+    extension = Path(image.filename or "").suffix.lower()
+
+    if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported image format",
+        )
+
+    filename = f"{uuid4()}{extension}"
+    image_path = UPLOAD_DIR / filename
+
+    contents = await image.read()
+    image_path.write_bytes(contents)
+
+    return f"/uploads/{filename}"
+
 # Add a new trip
 @app.post("/add_trip")
-async def add_trip(trip: dict, request: Request):
+async def add_trip(request: Request, name: str = Form(...), image: UploadFile | None = File(None)):
     user_id = get_current_user_id(request)
-    name = trip["name"]
+    image_url = await save_trip_image(image) if image else None
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO trips (user_id, name) VALUES (%s, %s) RETURNING id",
-                (user_id, name),
+                "INSERT INTO trips (user_id, name, image_url) VALUES (%s, %s, %s) RETURNING id",
+                (user_id, name, image_url),
             )
             trip_id = cursor.fetchone()[0]
-    return {"id": trip_id, "name": name}
+    return {"id": trip_id, "name": name, "image_url": image_url}
 
 
 #                               ---=== ACTIVITIES TABLE APIS ===---
