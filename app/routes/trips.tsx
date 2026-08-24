@@ -104,24 +104,30 @@ export default function Trips() {
                 transition-[border-color,box-shadow] duration-300
               "
             >
-              {trip.image_url && (
-                <img
-                  src={`http://localhost:8000${trip.image_url}`}
-                  alt={trip.name}
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              )}
+              {trip.image_url ? (
+                <>
+                  <img
+                    src={`http://localhost:8000${trip.image_url}`}
+                    alt={trip.name}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
 
-              <span
-                className="
-                  trip-card-title absolute inset-0
-                  flex items-center justify-center
-                  bg-[#181c2c]/70 text-[#efe4e9]
-                  opacity-0 transition-opacity duration-300
-                "
-              >
-                {trip.name}
-              </span>
+                  <span
+                    className="
+                      trip-card-title absolute inset-0
+                      flex items-center justify-center
+                      bg-[#181c2c]/70 text-[#efe4e9]
+                      opacity-0 transition-opacity duration-300
+                    "
+                  >
+                    {trip.name}
+                  </span>
+                </>
+              ) : (
+                <span className="px-4 text-center text-[#efe4e9]">
+                  {trip.name}
+                </span>
+              )}
             </Link>
           ))}
         </div>

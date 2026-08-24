@@ -36,9 +36,36 @@ export default function TripPage() {
     loadActivities();
   }, []);
 
+  
+  const [activityTags, setActivityTags] = useState<{ id: number; name: string }[]>([]);
+  const [tagName, setTagName] = useState("");
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
+  useEffect(() => {
+    if (!selectedActivity) {
+      setActivityTags([]);
+      return;
+    }
+
+    async function loadTags() {
+      const response = await fetch(
+        `http://localhost:8000/get_tags/${selectedActivity!.id}`,
+        { credentials: "include" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load tags");
+      }
+
+      const tags = await response.json();
+      setActivityTags(tags);
+    }
+
+    loadTags();
+  }, [selectedActivity]);
+
   // States for UI and form handling
   const [createActivityForm, setCreateActivityForm] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [activityName, setActivityName] = useState("");
   const [activityLocation, setActivityLocation] = useState("");
   const [activityPriceRange, setActivityPriceRange] = useState("");
@@ -90,8 +117,40 @@ export default function TripPage() {
     });
   }
 
+  async function addTag() {
+    if (!selectedActivity || !tagName.trim()) {
+      return;
+    }
+
+    const response = await fetch("http://localhost:8000/create_tag", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: tagName.trim(),
+        activity_id: selectedActivity.id,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to create tag");
+    }
+
+    const tag = await response.json();
+
+    setActivityTags((currentTags) =>
+      currentTags.some((currentTag) => currentTag.id === tag.id)
+        ? currentTags
+        : [...currentTags, tag]
+    );
+
+    setTagName("");
+  }
+
   return (
-    <main className="min-h-screen px-6 py-12">
+    <main className="activities-page min-h-screen px-6 py-12">
       <Link
         to="/trips"
         className="mb-6 inline-flex items-center rounded-full bg-gray-400 px-4 py-2 text-white hover:bg-purple-700"
@@ -241,6 +300,52 @@ export default function TripPage() {
               <h2 className="mb-8 text-center text-2xl font-bold text-purple-950">
                 {selectedActivity.name}
               </h2>
+
+              <div className="mt-6">
+                <p className="mb-2 font-semibold text-purple-950">Tags</p>
+
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {activityTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full bg-purple-950/15 px-3 py-1 text-sm text-purple-950"
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    addTag();
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    value={tagName}
+                    onChange={(event) => setTagName(event.target.value)}
+                    placeholder="Add a tag"
+                    className="
+                      flex-1 rounded-full border border-purple-900/20
+                      bg-white/30 px-4 py-2
+                      text-purple-950 placeholder:text-purple-900/50
+                      outline-none
+                    "
+                  />
+
+                  <button
+                    type="submit"
+                    className="
+                      rounded-full bg-purple-900/70
+                      px-4 py-2 text-white
+                    "
+                  >
+                    +
+                  </button>
+                </form>
+              </div>
 
               <div className="space-y-4 text-purple-950">
                 <p>

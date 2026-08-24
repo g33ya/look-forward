@@ -279,3 +279,114 @@ async def add_activity(activity: dict):
             )
             activity_id = cursor.fetchone()[0]
     return {"id": activity_id, "name": name, "trip_id": trip_id}
+
+# Get all of a user's tags
+@app.get("/get_tags")
+async def get_tags(request: Request):
+    user_id = get_current_user_id(request)
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, name
+                FROM tags
+                WHERE user_id = %s
+                ORDER BY name
+                """,
+                (user_id,),
+            )
+
+            tags = cursor.fetchall()
+
+    return [
+        {"id": tag[0], "name": tag[1]}
+        for tag in tags
+    ]
+
+# Get tags for a specific activity
+@app.get("/get_tags/{activity_id}")
+async def get_tags(activity_id: int, request: Request):
+    user_id = get_current_user_id(request)
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT tags.id, tags.name
+                FROM tags
+                JOIN activity_tags
+                    ON tags.id = activity_tags.tag_id
+                JOIN activities
+                    ON activities.id = activity_tags.activity_id
+                JOIN trips
+                    ON trips.id = activities.trip_id
+                WHERE activity_tags.activity_id = %s
+                  AND tags.user_id = %s
+                  AND trips.user_id = %s
+                ORDER BY tags.name
+                """,
+                (activity_id, user_id, user_id),
+            )
+
+            tags = cursor.fetchall()
+
+    return [
+        {"id": tag[0], "name": tag[1]}
+        for tag in tags
+    ]
+
+# Create tag
+@app.post("/create_tag")
+async def create_tag(request: Request, data: dict):
+    user_id = get_current_user_id(request)
+
+    tag_name = data["name"]
+    activity_id = data["activity_id"]
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT activities.id
+                FROM activities
+                JOIN trips ON activities.trip_id = trips.id
+                WHERE activities.id = %s
+                  AND trips.user_id = %s
+                """,
+                (activity_id, user_id),
+            )
+
+            if cursor.fetchone() is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Activity not found",
+                )
+
+            cursor.execute(
+                """
+                INSERT INTO tags (user_id, name)
+                VALUES (%s, %s)
+                ON CONFLICT (user_id, name)
+                DO UPDATE SET name = EXCLUDED.name
+                RETURNING id
+                """,
+                (user_id, tag_name),
+            )
+
+            tag_id = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                INSERT INTO activity_tags (activity_id, tag_id)
+                VALUES (%s, %s)
+                ON CONFLICT (activity_id, tag_id) DO NOTHING
+                """,
+                (activity_id, tag_id),
+            )
+
+    return {
+        "id": tag_id,
+        "name": tag_name,
+        "activity_id": activity_id,
+    }

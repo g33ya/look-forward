@@ -35,3 +35,16 @@ CREATE TABLE activities (
     links VARCHAR(2048),
     notes TEXT
 )
+
+CREATE TABLE tags (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    UNIQUE (user_id, name)
+);
+
+CREATE TABLE activity_tags (
+    activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (activity_id, tag_id)
+);
