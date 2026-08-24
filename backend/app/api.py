@@ -1,6 +1,7 @@
 import os
+from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import get_connection
@@ -8,6 +9,8 @@ from app.database import get_connection
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
+import hashlib
+import secrets
 
 app = FastAPI()
 
@@ -36,7 +39,7 @@ async def read_root() -> dict:
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 @app.post("/auth/google")
-async def google_login(data: dict):
+async def google_login(data: dict, response: Response):
     credential = data["credential"]
 
     try:
@@ -49,12 +52,16 @@ async def google_login(data: dict):
         google_id = user_info["sub"]
         email = user_info["email"]
         name = user_info["name"]
+        profile_picture = user_info.get("picture", None)
+
+        print("User picture:", profile_picture)  
+
 
         with get_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "INSERT INTO users (google_id, email, name) VALUES (%s, %s, %s) ON CONFLICT (google_id) DO NOTHING RETURNING id",
-                    (google_id, email, name),
+                    "INSERT INTO users (google_id, email, name, profile_picture) VALUES (%s, %s, %s, %s) ON CONFLICT (google_id) DO NOTHING RETURNING id",
+                    (google_id, email, name, profile_picture),
                 )
 
                 result = cursor.fetchone()
@@ -66,7 +73,26 @@ async def google_login(data: dict):
                     result = cursor.fetchone()
                 user_id = result[0]
 
-                return {"user_id": user_id, "email": email, "name": name}
+                session_token = secrets.token_urlsafe(32)
+                token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+                expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+
+                cursor.execute(
+                    "INSERT INTO sessions (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
+                    (user_id, token_hash, expires_at),
+                )
+
+                response.set_cookie(
+                    key="session_token",
+                    value=session_token,
+                    httponly=True,
+                    secure=False,  
+                    samesite="lax",
+                    max_age=7 * 24 * 60 * 60,
+                )
+
+                return {"email": email, "name": name, "profile_picture": profile_picture}
+
     except ValueError:
         raise HTTPException(
             status_code=401,
@@ -78,25 +104,86 @@ async def google_login(data: dict):
         "email": user_info["email"],
         "name": user_info["name"],
     }
+
+def get_current_user_id(request: Request) -> int:
+    session_token = request.cookies.get("session_token")
+
+    if session_token is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+        )
+
+    token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT user_id
+                FROM sessions
+                WHERE token_hash = %s
+                  AND expires_at > NOW()
+                """,
+                (token_hash,),
+            )
+
+            session = cursor.fetchone()
+
+    if session is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired session",
+        )
+
+    return session[0]
+
+@app.get("/auth/me")
+async def get_current_user(request: Request):
+    user_id = get_current_user_id(request)
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, name, email, profile_picture
+                FROM users
+                WHERE id = %s
+                """,
+                (user_id,),
+            )
+
+            user = cursor.fetchone()
+
+    return {
+        "id": user[0],
+        "name": user[1],
+        "email": user[2],
+        "profile_picture": user[3],
+    }
     
 #                                  ---=== TRIPS TABLE APIS ===---
 
 # Get all trips
 @app.get("/get_trips")
-async def get_trips():
+async def get_trips(request: Request):
+    user_id = get_current_user_id(request)
+
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT id, name FROM trips")
+            cursor.execute("SELECT id, name FROM trips WHERE user_id = %s", (user_id,))
             trips = cursor.fetchall()
 
     return [{"id": trip[0], "name": trip[1]} for trip in trips]
 
 # Get a specific trip by ID
 @app.get("/get_trip/{trip_id}")
-async def get_trip(trip_id: int):
+async def get_trip(trip_id: int, request: Request):
+    user_id = get_current_user_id(request)
+
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT id, name FROM trips WHERE id = %s", (trip_id,))
+            cursor.execute("SELECT id, name FROM trips WHERE id = %s AND user_id = %s", (trip_id, user_id))
             trip = cursor.fetchone()
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -104,18 +191,18 @@ async def get_trip(trip_id: int):
 
 # Add a new trip
 @app.post("/add_trip")
-async def add_trip(trip: dict):
+async def add_trip(trip: dict, request: Request):
+    user_id = get_current_user_id(request)
     name = trip["name"]
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO trips (name) VALUES (%s) RETURNING id",
-                (name,),
+                "INSERT INTO trips (user_id, name) VALUES (%s, %s) RETURNING id",
+                (user_id, name),
             )
             trip_id = cursor.fetchone()[0]
     return {"id": trip_id, "name": name}
-
 
 
 #                               ---=== ACTIVITIES TABLE APIS ===---

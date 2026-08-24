@@ -1,13 +1,22 @@
 DROP TABLE trips CASCADE;
 DROP TABLE activities CASCADE;
 DROP TABLE users CASCADE;
+DROP TABLE sessions CASCADE;
 
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     google_id TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
+    profile_picture TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE trips (
@@ -27,3 +36,6 @@ CREATE TABLE activities (
 )
 
 SELECT * FROM users;
+
+SELECT name, profile_picture
+FROM users;

@@ -21,7 +21,7 @@ export default function Trips() {
 
   useEffect(() => {
     async function loadTrips() {
-      const response = await fetch("http://localhost:8000/get_trips");
+      const response = await fetch("http://localhost:8000/get_trips", { credentials: "include" });
       const existingTrips = await response.json();
 
       setTrips(existingTrips);
@@ -36,6 +36,7 @@ export default function Trips() {
   async function asyncCreateTrip(tripName: string) {
     const response = await fetch("http://localhost:8000/add_trip", {
       method: "POST",
+      credentials: "include",
       headers: {
           "Content-Type": "application/json"
       },
