@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "react-router";
+import { APIProvider } from "@vis.gl/react-google-maps";
+import LocationAutocomplete from "../components/LocationAutocomplete";
 
 // Custom Activity type
 export default function TripPage() {
@@ -71,6 +73,8 @@ export default function TripPage() {
   const [activityPriceRange, setActivityPriceRange] = useState("");
   const [activityLinks, setActivityLinks] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   async function createActivity() {
     const response = await fetch("http://localhost:8000/add_activity", {
@@ -78,7 +82,7 @@ export default function TripPage() {
       headers: {
           "Content-Type": "application/json"
       },
-      body: JSON.stringify({ name: activityName.trim(), location: activityLocation.trim(), price_range: activityPriceRange || null, links: activityLinks.trim(), notes: activityNotes.trim(), trip_id: tripId })
+      body: JSON.stringify({ name: activityName.trim(), location: activityLocation.trim(), latitude: latitude, logitude: longitude, price_range: activityPriceRange || null, links: activityLinks.trim(), notes: activityNotes.trim(), trip_id: tripId })
     });
 
     const activity = await response.json();
@@ -203,12 +207,16 @@ export default function TripPage() {
               <div className="space-y-4">
                 <label className="flex items-center gap-3">
                   <span className="w-28 text-purple-950">Location:</span>
-                  <input
-                    type="text"
-                    value={activityLocation}
-                    onChange={(event) => setActivityLocation(event.target.value)}
-                    className="flex-1 rounded-lg bg-white/50 px-3 py-2 outline-none"
-                  />
+
+                  <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+                    <LocationAutocomplete
+                      onPlaceSelected={(place) => {
+                        setActivityLocation(place.address);
+                        setLatitude(place.latitude);
+                        setLongitude(place.longitude);
+                      }}
+                    />
+                  </APIProvider>
                 </label>
 
                 <label className="flex items-center gap-3">
@@ -350,7 +358,21 @@ export default function TripPage() {
               <div className="space-y-4 text-purple-950">
                 <p>
                   <span className="font-semibold">Location:</span>{" "}
-                  {selectedActivity.location}
+
+                  {selectedActivity.location ? (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                        selectedActivity.location
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline transition hover:text-purple-600"
+                    >
+                      {selectedActivity.location}
+                    </a>
+                  ) : (
+                    "No location provided"
+                  )}
                 </p>
 
                 <p>

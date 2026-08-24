@@ -267,6 +267,8 @@ async def add_activity(activity: dict):
     trip_id = activity["trip_id"]
     name = activity["name"]
     location = activity.get("location", None)
+    latitude = activity.get("latitude", None)
+    longitude = activity.get("longitude", None)
     price_range = activity.get("price_range", None)
     links = activity.get("links", None)
     notes = activity.get("notes", None)
@@ -274,8 +276,8 @@ async def add_activity(activity: dict):
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO activities (name, location, price_range, links, notes, trip_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                (name, location, price_range, links, notes, trip_id),
+                "INSERT INTO activities (name, location, latitude, longitude, price_range, links, notes, trip_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (name, location, latitude, longitude, price_range, links, notes, trip_id),
             )
             activity_id = cursor.fetchone()[0]
     return {"id": activity_id, "name": name, "trip_id": trip_id}

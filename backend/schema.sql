@@ -31,6 +31,8 @@ CREATE TABLE activities (
     trip_id INT REFERENCES trips(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     location VARCHAR(255) NOT NULL,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION;
     price_range VARCHAR(255) CHECK (price_range IN ('$', '$$', '$$$')),
     links VARCHAR(2048),
     notes TEXT
@@ -48,3 +50,7 @@ CREATE TABLE activity_tags (
     tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (activity_id, tag_id)
 );
+
+ALTER TABLE activities
+ADD COLUMN latitude DOUBLE PRECISION,
+ADD COLUMN longitude DOUBLE PRECISION;
