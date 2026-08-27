@@ -101,37 +101,59 @@ export default function TripPage() {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
 
-  async function createActivity() {
-    const response = await fetch("http://localhost:8000/add_activity", {
-      method: "POST",
-      headers: {
-          "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ name: activityName.trim(), location: activityLocation.trim(), latitude: latitude, longitude: longitude, price_range: activityPriceRange || null, links: activityLinks.trim(), notes: activityNotes.trim(), trip_id: tripId })
-    });
+  async function createActivity(event: React.SyntheticEvent<HTMLFormElement, SubmitEvent>) {
+    event.preventDefault();
+
+    const response = await fetch(
+      "http://localhost:8000/add_activity",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: activityName.trim(),
+          location: activityLocation.trim(),
+          latitude,
+          longitude,
+          price_range: activityPriceRange || null,
+          links: activityLinks.trim(),
+          notes: activityNotes.trim(),
+          trip_id: tripId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Failed to create activity:", error);
+      return;
+    }
 
     const activity = await response.json();
-    console.log(activity);
 
-    setActivities([
-      ...activities,
+    setActivities((currentActivities) => [
+      ...currentActivities,
       {
         id: activity.id,
         name: activityName.trim(),
         location: activityLocation.trim(),
-        latitude: latitude,
-        longitude: longitude,
-        priceRange: activityPriceRange.trim(),
-        tags: [],
+        latitude,
+        longitude,
+        priceRange: activityPriceRange,
         links: activityLinks.trim(),
         notes: activityNotes.trim(),
+        tags: [],
       },
     ]);
+
     setActivityName("");
     setActivityLocation("");
     setActivityPriceRange("");
     setActivityLinks("");
     setActivityNotes("");
+    setLatitude(null);
+    setLongitude(null);
     setCreateActivityForm(false);
   }
 
@@ -260,61 +282,146 @@ export default function TripPage() {
         <h1 className="mb-2 text-left text-5xl font-bold text-[#efe4e9]">
           {tripName}
         </h1>
-        <h2 className="mb-5 text-2xl font-semibold text-purple-900">
-          Activities
-        </h2>
+        <div className="mb-5 flex items-center gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-purple-300">
+            Activities
+          </h2>
+
+          <div className="h-px flex-1 bg-linear-to-r from-purple-300/50 to-transparent" />
+        </div>
 
         <button
           type="button"
           onClick={() => setCreateActivityForm(true)}
-          className="mb-5 rounded-full bg-purple-600 px-5 py-2 text-white hover:bg-purple-700"
+          className="
+            group mb-6 inline-flex items-center gap-2
+            rounded-full border border-purple-300/30
+            bg-purple-300/15 px-4 py-2
+            text-sm font-semibold text-purple-100
+            shadow-[0_0_18px_rgba(192,132,252,0.18)]
+            backdrop-blur-md
+            transition-all duration-200
+            hover:-translate-y-0.5
+            hover:border-purple-200/60
+            hover:bg-purple-300/25
+            hover:shadow-[0_0_24px_rgba(192,132,252,0.3)]
+          "
         >
-          + Add Activity
+          <span
+            className="
+              flex h-6 w-6 items-center justify-center
+              rounded-full bg-purple-300/25
+              text-lg leading-none
+              transition-transform duration-200
+              group-hover:rotate-90
+            "
+          >
+            +
+          </span>
+
+          Add activity
         </button>
 
         {createActivityForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div
+            className="
+              fixed inset-0 z-50
+              flex items-center justify-center px-4
+              bg-[#080b16]/65 backdrop-blur-md
+            "
+          >
             <form
               onSubmit={createActivity}
-              className="relative w-full max-w-md rounded-3xl bg-[#c9bddc] p-8 shadow-xl"
+              className="
+                relative w-full max-w-md overflow-hidden
+                rounded-4xl border border-white/20
+                bg-white/10 p-8
+                text-[#efe4e9]
+                shadow-[0_24px_80px_rgba(0,0,0,0.45),0_0_40px_rgba(192,132,252,0.15)]
+                backdrop-blur-2xl
+                before:pointer-events-none before:absolute
+                before:inset-x-8 before:top-0 before:h-px
+                before:bg-linear-to-r
+                before:from-transparent before:via-white/70
+                before:to-transparent
+              "
             >
               <button
                 type="button"
                 onClick={() => setCreateActivityForm(false)}
-                className="absolute right-5 top-4 text-xl text-purple-900"
+                aria-label="Close form"
+                className="
+                  absolute right-5 top-4 z-10
+                  flex h-8 w-8 items-center justify-center
+                  rounded-full border border-white/10
+                  bg-white/10 text-xl text-white/60
+                  transition duration-200
+                  hover:rotate-90 hover:bg-white/20 hover:text-white
+                "
               >
                 ×
               </button>
 
-              <div className="mx-auto mb-4 h-28 w-28 rounded-3xl bg-gray-200" />
+              <div className="mb-8 text-center">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-purple-200/60">
+                  New activity
+                </p>
 
-              <input
-                type="text"
-                value={activityName}
-                onChange={(event) => setActivityName(event.target.value)}
-                placeholder="Activity name"
-                className="mb-8 w-full bg-transparent text-center text-2xl font-bold text-purple-950 placeholder:text-purple-900/60 focus:outline-none"
-                required
-                autoFocus
-              />
+                <input
+                  type="text"
+                  value={activityName}
+                  onChange={(event) => setActivityName(event.target.value)}
+                  placeholder="Activity name"
+                  required
+                  autoFocus
+                  className="
+                    w-full border-b border-white/15
+                    bg-transparent pb-3 text-center
+                    text-2xl font-bold text-white
+                    placeholder:text-white/35
+                    outline-none transition
+                    focus:border-purple-300/60
+                  "
+                />
+              </div>
 
-              <div className="space-y-4">
-                <label className="flex items-center gap-3">
-                  <span className="w-28 text-purple-950">Location:</span>
+              <div className="space-y-5">
+                <div className="relative z-50">
+                  <label className="mb-2 block text-sm font-medium text-white/65">
+                    Location
+                  </label>
 
-                  <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-                    <LocationAutocomplete
-                      onPlaceSelected={(place) => {
-                        setActivityLocation(place.address);
-                        setLatitude(place.latitude);
-                        setLongitude(place.longitude);
-                      }}
-                    />
-                  </APIProvider>
-                </label>
+                  <div
+                    className="
+                      relative z-50
+                      rounded-xl border border-white/15
+                      bg-white/8 px-3 py-2
+                      shadow-inner backdrop-blur-md
+                      transition
+                      focus-within:border-purple-300/50
+                      focus-within:bg-white/12
+                      focus-within:ring-2
+                      focus-within:ring-purple-300/10
+                    "
+                  >
+                    <APIProvider
+                      apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+                    >
+                      <LocationAutocomplete
+                        onPlaceSelected={(place) => {
+                          setActivityLocation(place.address);
+                          setLatitude(place.latitude);
+                          setLongitude(place.longitude);
+                        }}
+                      />
+                    </APIProvider>
+                  </div>
+                </div>
 
-                <label className="flex items-center gap-3">
-                  <span className="w-28 text-purple-950">Price range:</span>
+                <div>
+                  <p className="mb-2 block text-sm font-medium text-white/65">
+                    Price range
+                  </p>
 
                   <div className="flex gap-2">
                     {["$", "$$", "$$$"].map((price) => (
@@ -322,42 +429,95 @@ export default function TripPage() {
                         key={price}
                         type="button"
                         onClick={() => setActivityPriceRange(price)}
-                        className={`font-semibold transition ${
-                          activityPriceRange === price
-                            ? "text-purple-950"
-                            : "text-purple-500/50 hover:text-purple-700"
-                        }`}
+                        className={`
+                          rounded-full border px-4 py-1.5
+                          text-sm font-semibold
+                          transition-all duration-200
+                          ${
+                            activityPriceRange === price
+                              ? `
+                                border-purple-200/50
+                                bg-purple-300/30 text-white
+                                shadow-[0_0_14px_rgba(192,132,252,0.25)]
+                              `
+                              : `
+                                border-white/10
+                                bg-white/6 text-white/40
+                                hover:bg-white/10 hover:text-white/70
+                              `
+                          }
+                        `}
                       >
                         {price}
                       </button>
                     ))}
                   </div>
-                </label>
+                </div>
 
-                <label className="flex items-center gap-3">
-                  <span className="w-28 text-purple-950">Links:</span>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-white/65">
+                    Link
+                  </label>
+
                   <input
                     type="text"
                     value={activityLinks}
                     onChange={(event) => setActivityLinks(event.target.value)}
-                    className="flex-1 rounded-lg bg-white/50 px-3 py-2 outline-none"
+                    placeholder="Link 1, Link 2, Link 3"
+                    className="
+                      w-full rounded-xl
+                      border border-white/15
+                      bg-white/8 px-4 py-2.5
+                      text-white placeholder:text-white/30
+                      shadow-inner outline-none
+                      backdrop-blur-md transition
+                      focus:border-purple-300/50
+                      focus:bg-white/12
+                      focus:ring-2 focus:ring-purple-300/10
+                    "
                   />
-                </label>
+                </div>
 
-                <label className="flex items-start gap-3">
-                  <span className="w-28 pt-2 text-purple-950">Notes:</span>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-white/65">
+                    Notes
+                  </label>
+
                   <textarea
                     value={activityNotes}
                     onChange={(event) => setActivityNotes(event.target.value)}
+                    placeholder="Anything you want to remember..."
                     rows={3}
-                    className="flex-1 rounded-lg bg-white/50 px-3 py-2 outline-none"
+                    className="
+                      w-full resize-none rounded-xl
+                      border border-white/15
+                      bg-white/8 px-4 py-2.5
+                      text-white placeholder:text-white/30
+                      shadow-inner outline-none
+                      backdrop-blur-md transition
+                      focus:border-purple-300/50
+                      focus:bg-white/12
+                      focus:ring-2 focus:ring-purple-300/10
+                    "
                   />
-                </label>
+                </div>
               </div>
 
               <button
                 type="submit"
-                className="mt-6 w-full rounded-full bg-purple-600 py-2 text-white hover:bg-purple-700"
+                className="
+                  mt-7 w-full rounded-full
+                  border border-purple-200/30
+                  bg-purple-300/25 py-2.5
+                  font-semibold text-white
+                  shadow-[0_0_22px_rgba(192,132,252,0.2)]
+                  backdrop-blur-md
+                  transition-all duration-200
+                  hover:-translate-y-0.5
+                  hover:border-purple-200/50
+                  hover:bg-purple-300/35
+                  hover:shadow-[0_0_30px_rgba(192,132,252,0.35)]
+                "
               >
                 Create activity
               </button>
