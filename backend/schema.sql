@@ -50,6 +50,3 @@ CREATE TABLE activity_tags (
     tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (activity_id, tag_id)
 );
-
-SELECT name, latitude, longitude
-FROM activities;

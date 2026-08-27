@@ -2,9 +2,15 @@ import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "react-router";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import LocationAutocomplete from "../components/LocationAutocomplete";
+import calculateDistanceMiles from "../helpers/calculateDistanceMiles";
 
 // Custom Activity type
 export default function TripPage() {
+  type Tag = {
+   id: number;
+   name: string;
+  };
+
   type Activity = {
     id: number;
     name: string;
@@ -12,6 +18,7 @@ export default function TripPage() {
     latitude: number | null;
     longitude: number | null;
     priceRange: string;
+    tags: Tag[];
     links: string;
     notes: string;
   };
@@ -30,7 +37,8 @@ export default function TripPage() {
   useEffect(() => {
       async function loadActivities() {
         const response = await fetch(
-          `http://localhost:8000/get_activities/${trip}`
+          `http://localhost:8000/get_activities/${trip}`,
+          { credentials: "include" }
         );
         const existingActivities = await response.json();
 
@@ -41,7 +49,7 @@ export default function TripPage() {
   }, []);
 
   
-  const [activityTags, setActivityTags] = useState<{ id: number; name: string }[]>([]);
+  const [activityTags, setActivityTags] = useState<Tag[]>([]);
   const [tagName, setTagName] = useState("");
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
@@ -82,6 +90,7 @@ export default function TripPage() {
       }
     );
   }, []);
+
   // States for UI and form handling
   const [createActivityForm, setCreateActivityForm] = useState(false);
   const [activityName, setActivityName] = useState("");
@@ -113,6 +122,7 @@ export default function TripPage() {
         latitude: latitude,
         longitude: longitude,
         priceRange: activityPriceRange.trim(),
+        tags: [],
         links: activityLinks.trim(),
         notes: activityNotes.trim(),
       },
@@ -169,49 +179,87 @@ export default function TripPage() {
     );
 
     setTagName("");
-  }
+    
+    setActivities((currentActivities) =>
+      currentActivities.map((activity) => {
+        if (activity.id !== selectedActivity.id) {
+          return activity;
+        }
 
-  function calculateDistanceMiles(
-    latitude1: number,
-    longitude1: number,
-    latitude2: number,
-    longitude2: number
-  ) {
-    const earthRadiusMiles = 3958.8;
+        const alreadyHasTag = activity.tags.some(
+          (activityTag) => activityTag.id === tag.id
+        );
 
-    const toRadians = (degrees: number) => {
-      return (degrees * Math.PI) / 180;
-    };
-
-    const deltaLatitude = toRadians(latitude2 - latitude1);
-    const deltaLongitude = toRadians(longitude2 - longitude1);
-
-    const a =
-      Math.sin(deltaLatitude / 2) ** 2 +
-      Math.cos(toRadians(latitude1)) *
-        Math.cos(toRadians(latitude2)) *
-        Math.sin(deltaLongitude / 2) ** 2;
-
-    return (
-      earthRadiusMiles *
-      2 *
-      Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return {
+          ...activity,
+          tags: alreadyHasTag
+            ? activity.tags
+            : [...activity.tags, tag],
+        };
+      })
     );
   }
+
+  const [maxDistance, setMaxDistance] = useState(300);
+  const [selectedPrices, setSelectedPrices] = useState<string[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+
+  const availableTags = Array.from(
+    new Map(
+      activities
+        .flatMap((activity) => activity.tags)
+        .map((tag) => [tag.id, tag])
+    ).values()
+  );
+
+  const filteredActivities = activities.filter((activity) => {
+    const distance =
+      userLocation &&
+      activity.latitude != null &&
+      activity.longitude != null
+        ? calculateDistanceMiles(
+            userLocation.latitude,
+            userLocation.longitude,
+            activity.latitude,
+            activity.longitude
+          )
+        : null;
+
+    const matchesDistance =
+      distance === null || distance <= maxDistance;
+
+    const matchesPrice =
+      selectedPrices.length === 0 ||
+      selectedPrices.includes(activity.priceRange);
+    
+    const matchesTags =
+      selectedTagIds.length === 0 ||
+      activity.tags.some((tag) =>
+        selectedTagIds.includes(tag.id)
+      );
+
+    return matchesDistance && matchesPrice && matchesTags;
+  });
 
   return (
     <main className="activities-page min-h-screen px-6 py-12">
       <Link
         to="/trips"
-        className="mb-6 inline-flex items-center rounded-full bg-gray-400 px-4 py-2 text-white hover:bg-purple-700"
+        className="
+          mb-8 inline-flex items-center gap-2
+          text-sm font-medium text-purple-300
+          transition-all duration-200
+          hover:-translate-x-1 hover:text-purple-100
+        "
       >
-        ← Back to trips
+        <span aria-hidden="true">←</span>
+        to trips
       </Link>
-      <h1 className="mb-10 text-center text-5xl font-bold text-purple-700">
-        {tripName}
-      </h1>
 
-      <section className="mx-auto max-w-3xl">
+      <section className="mx-auto w-full max-w-6xl">
+        <h1 className="mb-2 text-left text-5xl font-bold text-[#efe4e9]">
+          {tripName}
+        </h1>
         <h2 className="mb-5 text-2xl font-semibold text-purple-900">
           Activities
         </h2>
@@ -316,55 +364,143 @@ export default function TripPage() {
             </form>
           </div>
         )}
+        <div className="flex items-start gap-8">
+          <aside
+              className="
+                w-56 shrink-0 rounded-3xl
+                border border-white/15
+                bg-purple-300/20 p-5
+                text-[#efe4e9]
+                shadow-[0_0_24px_rgba(192,132,252,0.12)]
+                backdrop-blur-xl
+              "
+            >
+              <h3 className="mb-5 text-lg font-semibold">Filters</h3>
 
-        <div className="grid max-h-105 grid-cols-2 gap-5 overflow-y-auto md:grid-cols-4">
-          {activities.map((activity) => {
-            console.log({
-    activity: activity.name,
-    userLocation,
-    latitude: activity.latitude,
-    longitude: activity.longitude,
-  });
-            const distance =
-              userLocation &&
-              activity.latitude != null &&
-              activity.longitude != null
-                ? calculateDistanceMiles(
-                    userLocation.latitude,
-                    userLocation.longitude,
-                    activity.latitude,
-                    activity.longitude
-                  )
-                : null;
+              <div className="mb-6">
+                <label className="mb-2 block text-sm">
+                  Distance: {maxDistance} miles
+                </label>
 
-            return (
-              <button
-                key={activity.id}
-                type="button"
-                onClick={() => getActivity(activity.id)}
-                className="
-                  relative aspect-square w-44 overflow-hidden
-                  rounded-3xl border border-purple-300/30
-                  bg-white/40
-                "
-              >
-                {distance !== null && (
-                  <span
-                    className="
-                      absolute right-2 top-2 z-10
-                      rounded-full border border-white/20
-                      bg-[#181c2c]/70 px-3 py-1
-                      text-xs text-white backdrop-blur-md
-                    "
-                  >
-                    {distance.toFixed(1)} mi
-                  </span>
-                )}
+                <input
+                  type="range"
+                  min="1"
+                  max="300"
+                  value={maxDistance}
+                  onChange={(event) => {
+                    setMaxDistance(Number(event.target.value));
+                  }}
+                  className="w-full accent-purple-300"
+                />
+              </div>
 
-                <span>{activity.name}</span>
-              </button>
-            );
-          })}
+              <div>
+                <p className="mb-3 text-sm">Price range</p>
+
+                <div className="flex gap-2">
+                  {["$", "$$", "$$$"].map((price) => (
+                    <button
+                      key={price}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPrices((currentPrices) =>
+                          currentPrices.includes(price)
+                            ? currentPrices.filter(
+                                (currentPrice) => currentPrice !== price
+                              )
+                            : [...currentPrices, price]
+                        );
+                      }}
+                      className={`
+                        rounded-full px-3 py-1
+                        text-sm transition duration-300
+                        ${
+                          selectedPrices.includes(price)
+                            ? "bg-purple-300/40 text-white"
+                            : "bg-white/10 text-white/60"
+                        }
+                      `}
+                    >
+                      {price}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6">
+  <p className="mb-3 text-sm">Tags</p>
+
+  <div className="flex flex-wrap gap-2">
+    {availableTags.map((tag) => (
+      <button
+        key={tag.id}
+        type="button"
+        onClick={() => {
+          setSelectedTagIds((currentIds) =>
+            currentIds.includes(tag.id)
+              ? currentIds.filter((id) => id !== tag.id)
+              : [...currentIds, tag.id]
+          );
+        }}
+        className={`
+          rounded-full px-3 py-1 text-sm transition
+          ${
+            selectedTagIds.includes(tag.id)
+              ? "bg-purple-300/40 text-white"
+              : "bg-white/10 text-white/60 hover:bg-white/20"
+          }
+        `}
+      >
+        {tag.name}
+      </button>
+    ))}
+  </div>
+</div>
+              
+            </aside>
+          <div className="grid max-h-105 grid-cols-2 gap-5 overflow-y-auto md:grid-cols-4">
+            {filteredActivities.map((activity) => {
+              const distance =
+                userLocation &&
+                activity.latitude != null &&
+                activity.longitude != null
+                  ? calculateDistanceMiles(
+                      userLocation.latitude,
+                      userLocation.longitude,
+                      activity.latitude,
+                      activity.longitude
+                    )
+                  : null;
+
+              return (
+                <button
+                  key={activity.id}
+                  type="button"
+                  onClick={() => getActivity(activity.id)}
+                  className="
+                    relative aspect-square w-44 overflow-hidden
+                    rounded-3xl border border-purple-300/30
+                    bg-white/40
+                  "
+                >
+                  {distance !== null && (
+                    <span
+                      className="
+                        absolute right-2 top-2 z-10
+                        rounded-full border border-white/20
+                        bg-[#181c2c]/70 px-3 py-1
+                        text-xs text-white backdrop-blur-md
+                      "
+                    >
+                      {distance.toFixed(1)} mi
+                    </span>
+                  )}
+
+                  <span>{activity.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {selectedActivity && (
