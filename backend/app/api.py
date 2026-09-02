@@ -49,49 +49,52 @@ async def read_root() -> dict:
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 @app.post("/auth/google")
-async def google_login(data: dict, response: Response):
-    credential = data["credential"]
+async def google_login(data: dict, response: Response): # data is a dict from Google sign-in containing its generated credential
+    credential = data["credential"] 
 
     try:
-        user_info = id_token.verify_oauth2_token(
+        user_info = id_token.verify_oauth2_token( # verify credential
             credential,
             requests.Request(),
             GOOGLE_CLIENT_ID,
         )
 
+        # Extract user info from verified credential token
         google_id = user_info["sub"]
         email = user_info["email"]
         name = user_info["name"]
         profile_picture = user_info.get("picture", None)
 
-        print("User picture:", profile_picture)  
-
-
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
+        with get_connection() as connection: # connection to PSQL, with keyword to ensure closing of connection
+            with connection.cursor() as cursor: # cursor is object used to send commands/read results from PSQL w/ psycopg
                 cursor.execute(
                     "INSERT INTO users (google_id, email, name, profile_picture) VALUES (%s, %s, %s, %s) ON CONFLICT (google_id) DO NOTHING RETURNING id",
                     (google_id, email, name, profile_picture),
                 )
 
                 result = cursor.fetchone()
+                # User already exists, fetch ID
                 if result is None:
                     cursor.execute(
                         "SELECT id FROM users WHERE google_id = %s",
                         (google_id,),
                     )
                     result = cursor.fetchone()
+
                 user_id = result[0]
 
+                # Generate session token
                 session_token = secrets.token_urlsafe(32)
-                token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+                token_hash = hashlib.sha256(session_token.encode()).hexdigest() # hash the session token for security
                 expires_at = datetime.now(timezone.utc) + timedelta(days=7)
 
+                # Store session token in database
                 cursor.execute(
                     "INSERT INTO sessions (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
                     (user_id, token_hash, expires_at),
                 )
 
+                # Include Set-Cookie header 
                 response.set_cookie(
                     key="session_token",
                     value=session_token,
@@ -115,6 +118,7 @@ async def google_login(data: dict, response: Response):
         "name": user_info["name"],
     }
 
+# Internal helper used to protect endpoints (session token check)
 def get_current_user_id(request: Request) -> int:
     session_token = request.cookies.get("session_token")
 
@@ -148,6 +152,7 @@ def get_current_user_id(request: Request) -> int:
 
     return session[0]
 
+# Endpoint to return user info
 @app.get("/auth/me")
 async def get_current_user(request: Request):
     user_id = get_current_user_id(request)
@@ -199,8 +204,7 @@ async def get_trip(trip_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Trip not found")
     return {"id": trip[0], "name": trip[1]}
 
-
-
+# gets path for upload directory
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -349,7 +353,7 @@ async def create_tag(request: Request, data: dict):
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
+                """ 
                 SELECT activities.id
                 FROM activities
                 JOIN trips ON activities.trip_id = trips.id

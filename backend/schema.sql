@@ -42,11 +42,32 @@ CREATE TABLE tags (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    UNIQUE (user_id, name)
+    UNIQUE (user_id, name) -- constraint to ensure no duplicate tags for a user
 );
 
 CREATE TABLE activity_tags (
     activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
     tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    PRIMARY KEY (activity_id, tag_id)
+    PRIMARY KEY (activity_id, tag_id) -- composite primary key to ensure no duplicate tags in an activity
+    /* example :)
+        activity_id     tag_id
+        ----------      -------
+        1               4
+        1               10
+        2               1
+        2               4
+
+        activity 1 has two tags 4/10
+        activity 2 has two tags 1/4
+        both activity 1/2 share tag 4
+    */
 );
+
+
+SELECT * FROM activities
+WHERE trip_id=40;
+
+DELETE FROM activities
+WHERE trip_id = 40;
+
+SELECT * FROM trips

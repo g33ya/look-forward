@@ -22,6 +22,7 @@ type Trip = {
 export default function Trips() {
   const [trips, setTrips] = useState<Trip[]>([]);
 
+  // Load user's trip
   useEffect(() => {
     async function loadTrips() {
       const response = await fetch("http://localhost:8000/get_trips", { credentials: "include" });
@@ -33,6 +34,7 @@ export default function Trips() {
   loadTrips();
   }, []);
 
+  // Load user's name for display
   const [userName, setUserName] = useState("");
   useEffect(() => {
     async function getUserName() {
@@ -48,7 +50,8 @@ export default function Trips() {
   const [tripName, setTripName] = useState("");
   const [tripImage, setTripImage] = useState<File | null>(null);
 
-  async function asyncCreateTrip(tripName: string) {
+  async function asyncCreateTrip(tripName: string, event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
     const formData = new FormData();
     formData.append("name", tripName);
 
@@ -76,6 +79,7 @@ export default function Trips() {
     setShowForm(false);
   }
 
+  // Toolbar menu items
   const items = [
       { icon: <VscAdd size={15} />, label: 'create trip', onClick: () => setShowForm(true) },
       { icon: <VscArchive size={18}/>, label: 'view archive', onClick: () => alert('not implemented yet :3') },
@@ -94,7 +98,7 @@ export default function Trips() {
           {trips.map((trip) => (
             <Link
               key={trip.id}
-              to={`/trips/${trip.id}`}
+              to={`/activities/${trip.id}`}
               state={{ tripName: trip.name }}
               className="
                 trip-card relative flex aspect-square w-44
@@ -136,7 +140,7 @@ export default function Trips() {
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                asyncCreateTrip(tripName);
+                asyncCreateTrip(tripName, event);
               }}
               className="
                 absolute bottom-full left-1/2 mb-4

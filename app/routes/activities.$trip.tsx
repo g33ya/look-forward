@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useLocation, Link } from "react-router";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import LocationAutocomplete from "../components/LocationAutocomplete";
@@ -28,7 +28,7 @@ export default function TripPage() {
   if (!trip) return;
   const tripId = parseInt(trip, 10);
 
-  // Get trip name from location state
+  // Get trip name from location state (which stores the Link object's info)
   const { state } = useLocation();
   const tripName = state?.tripName || ""; 
 
@@ -41,12 +41,10 @@ export default function TripPage() {
           { credentials: "include" }
         );
         const existingActivities = await response.json();
-
         setActivities(existingActivities);
       }
-  
     loadActivities();
-  }, []);
+  }, [trip]);
 
   
   const [activityTags, setActivityTags] = useState<Tag[]>([]);
@@ -64,18 +62,13 @@ export default function TripPage() {
         `http://localhost:8000/get_tags/${selectedActivity!.id}`,
         { credentials: "include" }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to load tags");
-      }
-
       const tags = await response.json();
       setActivityTags(tags);
     }
-
     loadTags();
   }, [selectedActivity]);
 
+  // Get user's current location for distance calculations
   const [userLocation, setUserLocation] = useState<{latitude: number;longitude: number;} | null>(null);
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -91,38 +84,47 @@ export default function TripPage() {
     );
   }, []);
 
-  // States for UI and form handling
+  // States for activity creation form
+  type ActivityForm = {
+    name: string;
+    location: string;
+    priceRange: string;
+    links: string;
+    notes: string;
+    latitude: number | null;
+    longitude: number | null;
+  };
   const [createActivityForm, setCreateActivityForm] = useState(false);
-  const [activityName, setActivityName] = useState("");
-  const [activityLocation, setActivityLocation] = useState("");
-  const [activityPriceRange, setActivityPriceRange] = useState("");
-  const [activityLinks, setActivityLinks] = useState("");
-  const [activityNotes, setActivityNotes] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
 
-  async function createActivity(event: React.SyntheticEvent<HTMLFormElement, SubmitEvent>) {
-    event.preventDefault();
+  const [activity, setActivity] = useState<ActivityForm>({
+    name: "",
+    location: "",
+    priceRange: "",
+    links: "",
+    notes: "",
+    latitude: null,
+    longitude: null,
+  });
 
-    const response = await fetch(
-      "http://localhost:8000/add_activity",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: activityName.trim(),
-          location: activityLocation.trim(),
-          latitude,
-          longitude,
-          price_range: activityPriceRange || null,
-          links: activityLinks.trim(),
-          notes: activityNotes.trim(),
-          trip_id: tripId,
-        }),
-      }
-    );
+  async function createActivity( event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const response = await fetch("http://localhost:8000/add_activity", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: activity.name.trim(),
+        location: activity.location.trim(),
+        latitude: activity.latitude,
+        longitude: activity.longitude,
+        price_range: activity.priceRange || null,
+        links: activity.links.trim(),
+        notes: activity.notes.trim(),
+        trip_id: tripId,
+      }),
+    });
 
     if (!response.ok) {
       const error = await response.text();
@@ -130,31 +132,34 @@ export default function TripPage() {
       return;
     }
 
-    const activity = await response.json();
+    const createdActivity = await response.json();
+
+    setCreateActivityForm(false);
 
     setActivities((currentActivities) => [
       ...currentActivities,
       {
-        id: activity.id,
-        name: activityName.trim(),
-        location: activityLocation.trim(),
-        latitude,
-        longitude,
-        priceRange: activityPriceRange,
-        links: activityLinks.trim(),
-        notes: activityNotes.trim(),
+        id: createdActivity.id,
+        name: activity.name.trim(),
+        location: activity.location.trim(),
+        latitude: activity.latitude,
+        longitude: activity.longitude,
+        priceRange: activity.priceRange,
+        links: activity.links.trim(),
+        notes: activity.notes.trim(),
         tags: [],
       },
     ]);
 
-    setActivityName("");
-    setActivityLocation("");
-    setActivityPriceRange("");
-    setActivityLinks("");
-    setActivityNotes("");
-    setLatitude(null);
-    setLongitude(null);
-    setCreateActivityForm(false);
+    setActivity({
+      name: "",
+      location: "",
+      priceRange: "",
+      links: "",
+      notes: "",
+      latitude: null,
+      longitude: null,
+    });
   }
 
   // Get a specific activity by ID to display UI details
@@ -167,7 +172,8 @@ export default function TripPage() {
 
     setSelectedActivity({
       ...activity,
-      priceRange: activity.price_range,
+      priceRange: activity.price_range, // backend stores priceRange as price_range
+
     });
   }
 
@@ -195,13 +201,14 @@ export default function TripPage() {
     const tag = await response.json();
 
     setActivityTags((currentTags) =>
-      currentTags.some((currentTag) => currentTag.id === tag.id)
+      currentTags.some((currentTag) => currentTag.id === tag.id) // prevents duplicates
         ? currentTags
         : [...currentTags, tag]
     );
 
     setTagName("");
     
+    // Update the activity's tags in the activities state
     setActivities((currentActivities) =>
       currentActivities.map((activity) => {
         if (activity.id !== selectedActivity.id) {
@@ -222,6 +229,7 @@ export default function TripPage() {
     );
   }
 
+  // Filter states
   const [maxDistance, setMaxDistance] = useState(300);
   const [selectedPrices, setSelectedPrices] = useState<string[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
@@ -229,8 +237,8 @@ export default function TripPage() {
   const availableTags = Array.from(
     new Map(
       activities
-        .flatMap((activity) => activity.tags)
-        .map((tag) => [tag.id, tag])
+        .flatMap((activity) => activity.tags) // combine all activity tag arrays into one
+        .map((tag) => [tag.id, tag]) 
     ).values()
   );
 
@@ -279,7 +287,7 @@ export default function TripPage() {
       </Link>
 
       <section className="mx-auto w-full max-w-6xl">
-        <h1 className="mb-2 text-left text-5xl font-bold text-[#efe4e9]">
+        <h1 className="mb-10 text-left text-5xl font-bold text-[#efe4e9]">
           {tripName}
         </h1>
         <div className="mb-5 flex items-center gap-3">
@@ -369,8 +377,8 @@ export default function TripPage() {
 
                 <input
                   type="text"
-                  value={activityName}
-                  onChange={(event) => setActivityName(event.target.value)}
+                  value={activity.name}
+                  onChange={(event) => setActivity({ ...activity, name: event.target.value })}
                   placeholder="Activity name"
                   required
                   autoFocus
@@ -409,9 +417,7 @@ export default function TripPage() {
                     >
                       <LocationAutocomplete
                         onPlaceSelected={(place) => {
-                          setActivityLocation(place.address);
-                          setLatitude(place.latitude);
-                          setLongitude(place.longitude);
+                          setActivity({ ...activity, location: place.address, latitude: place.latitude, longitude: place.longitude });
                         }}
                       />
                     </APIProvider>
@@ -428,13 +434,13 @@ export default function TripPage() {
                       <button
                         key={price}
                         type="button"
-                        onClick={() => setActivityPriceRange(price)}
+                        onClick={() => setActivity({...activity, priceRange: price})}
                         className={`
                           rounded-full border px-4 py-1.5
                           text-sm font-semibold
                           transition-all duration-200
                           ${
-                            activityPriceRange === price
+                            activity.priceRange === price
                               ? `
                                 border-purple-200/50
                                 bg-purple-300/30 text-white
@@ -461,8 +467,8 @@ export default function TripPage() {
 
                   <input
                     type="text"
-                    value={activityLinks}
-                    onChange={(event) => setActivityLinks(event.target.value)}
+                    value={activity.links}
+                    onChange={(event) => setActivity({...activity, links: event.target.value})}
                     placeholder="Link 1, Link 2, Link 3"
                     className="
                       w-full rounded-xl
@@ -484,8 +490,8 @@ export default function TripPage() {
                   </label>
 
                   <textarea
-                    value={activityNotes}
-                    onChange={(event) => setActivityNotes(event.target.value)}
+                    value={activity.notes}
+                    onChange={(event) => setActivity({...activity, notes: event.target.value})}
                     placeholder="Anything you want to remember..."
                     rows={3}
                     className="
@@ -588,35 +594,34 @@ export default function TripPage() {
               </div>
 
               <div className="mt-6">
-  <p className="mb-3 text-sm">Tags</p>
+                <p className="mb-3 text-sm">Tags</p>
 
-  <div className="flex flex-wrap gap-2">
-    {availableTags.map((tag) => (
-      <button
-        key={tag.id}
-        type="button"
-        onClick={() => {
-          setSelectedTagIds((currentIds) =>
-            currentIds.includes(tag.id)
-              ? currentIds.filter((id) => id !== tag.id)
-              : [...currentIds, tag.id]
-          );
-        }}
-        className={`
-          rounded-full px-3 py-1 text-sm transition
-          ${
-            selectedTagIds.includes(tag.id)
-              ? "bg-purple-300/40 text-white"
-              : "bg-white/10 text-white/60 hover:bg-white/20"
-          }
-        `}
-      >
-        {tag.name}
-      </button>
-    ))}
-  </div>
-</div>
-              
+                <div className="flex flex-wrap gap-2">
+                  {availableTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTagIds((currentIds) =>
+                          currentIds.includes(tag.id)
+                            ? currentIds.filter((id) => id !== tag.id)
+                            : [...currentIds, tag.id]
+                        );
+                      }}
+                      className={`
+                        rounded-full px-3 py-1 text-sm transition
+                        ${
+                          selectedTagIds.includes(tag.id)
+                            ? "bg-purple-300/40 text-white"
+                            : "bg-white/10 text-white/60 hover:bg-white/20"
+                        }
+                      `}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </aside>
           <div className="grid max-h-105 grid-cols-2 gap-5 overflow-y-auto md:grid-cols-4">
             {filteredActivities.map((activity) => {
@@ -652,7 +657,7 @@ export default function TripPage() {
                         text-xs text-white backdrop-blur-md
                       "
                     >
-                      {distance.toFixed(1)} mi
+                      ~{distance.toFixed(1)} mi
                     </span>
                   )}
 
