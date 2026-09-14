@@ -21,6 +21,8 @@ from uuid import uuid4
 from fastapi import File, Form, HTTPException, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 
+from typing import Optional
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -286,6 +288,109 @@ async def add_activity(activity: dict):
             activity_id = cursor.fetchone()[0]
     return {"id": activity_id, "name": name, "trip_id": trip_id}
 
+class ActivityUpdate(BaseModel):
+    name: str | None = None
+    location: str | None = None
+    price_range: str | None = None
+    links: str | None = None
+    notes: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+@app.patch("/activities/{activity_id}")
+async def update_activity(
+    activity_id: int,
+    activity: ActivityUpdate,
+    request: Request,
+):
+    user_id = get_current_user_id(request)
+
+    updates = activity.model_dump(exclude_unset=True)
+
+    if not updates:
+        raise HTTPException(
+            status_code=400,
+            detail="No fields provided for update",
+        )
+
+    allowed_columns = {
+        "name",
+        "location",
+        "price_range",
+        "links",
+        "notes",
+        "latitude",
+        "longitude",
+    }
+
+    updates = {
+        column: value
+        for column, value in updates.items()
+        if column in allowed_columns
+    }
+
+    if not updates:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid fields provided for update",
+        )
+
+    set_clause = ", ".join(
+        f"{column} = %s" for column in updates
+    )
+
+    values = [
+        *updates.values(),
+        activity_id,
+        user_id,
+    ]
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                UPDATE activities
+                SET {set_clause}
+                WHERE activities.id = %s
+                  AND activities.trip_id IN (
+                      SELECT id
+                      FROM trips
+                      WHERE user_id = %s
+                  )
+                RETURNING
+                    id,
+                    name,
+                    location,
+                    price_range,
+                    links,
+                    notes,
+                    latitude,
+                    longitude
+                """,
+                values,
+            )
+
+            updated_activity = cursor.fetchone()
+
+        connection.commit()
+
+    if updated_activity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Activity not found",
+        )
+
+    return {
+        "id": updated_activity[0],
+        "name": updated_activity[1],
+        "location": updated_activity[2],
+        "price_range": updated_activity[3],
+        "links": updated_activity[4],
+        "notes": updated_activity[5],
+        "latitude": updated_activity[6],
+        "longitude": updated_activity[7],
+    }
 # Get all of a user's tags
 @app.get("/get_tags")
 async def get_tags(request: Request):

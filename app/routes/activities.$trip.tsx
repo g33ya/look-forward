@@ -49,7 +49,9 @@ export default function TripPage() {
   
   const [activityTags, setActivityTags] = useState<Tag[]>([]);
   const [tagName, setTagName] = useState("");
+  const [showTagInput, setShowTagInput] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [editActivity, setEditActivity] = useState<Activity | null>(null);
 
   useEffect(() => {
     if (!selectedActivity) {
@@ -228,6 +230,55 @@ export default function TripPage() {
       })
     );
   }
+
+  // Edit an activity
+  async function updateActivity(event: React.SubmitEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  if (!editActivity) {
+    return;
+  }
+
+  const response = await fetch(
+    `http://localhost:8000/activities/${editActivity.id}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: editActivity.name.trim(),
+        location: editActivity.location.trim(),
+        latitude: editActivity.latitude,
+        longitude: editActivity.longitude,
+        price_range: editActivity.priceRange || null,
+        links: editActivity.links.trim(),
+        notes: editActivity.notes.trim(),
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("Failed to update activity:", error);
+    return;
+  }
+
+  setActivities((currentActivities) =>
+    currentActivities.map((activity) =>
+      activity.id === editActivity.id
+        ? {
+            ...activity,
+            ...editActivity,
+          }
+        : activity
+    )
+  );
+
+  setSelectedActivity(editActivity);
+  setEditActivity(null);
+}
 
   // Filter states
   const [maxDistance, setMaxDistance] = useState(300);
@@ -669,71 +720,184 @@ export default function TripPage() {
         </div>
 
         {selectedActivity && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="relative w-full max-w-md rounded-3xl bg-[#c9bddc] p-8 shadow-xl">
+          <div
+            className="
+              fixed inset-0 z-50 flex items-center justify-center
+              bg-[#0d1020]/70 px-4 backdrop-blur-sm
+            "
+            onClick={() => setSelectedActivity(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="activity-title"
+              onClick={(event) => event.stopPropagation()}
+              className="
+                relative max-h-[90vh] w-full max-w-lg overflow-y-auto
+                rounded-[2rem] border border-purple-300/20
+                bg-[#25283d]/85 p-8
+                text-purple-100
+                shadow-[0_0_50px_rgba(168,85,247,0.22)]
+                backdrop-blur-2xl
+              "
+            >
               <button
                 type="button"
+                aria-label="Close activity"
                 onClick={() => setSelectedActivity(null)}
-                className="absolute right-5 top-4 text-xl text-purple-900"
+                className="
+                  absolute right-5 top-4 text-2xl text-purple-300/70
+                  transition hover:scale-110 hover:text-white
+                "
               >
                 ×
               </button>
 
-              <div className="mx-auto mb-4 h-28 w-28 rounded-3xl bg-gray-200" />
+              <button
+                type="button"
+                aria-label="Edit activity"
+                onClick={() => {
+                  setEditActivity({
+                    ...selectedActivity,
+                    tags: activityTags,
+                  });
 
-              <h2 className="mb-8 text-center text-2xl font-bold text-purple-950">
+                  setSelectedActivity(null);
+                }}
+                className="
+                  absolute right-14 top-4
+                  text-xl text-purple-300/70
+                  transition
+                  hover:scale-110 hover:text-white
+                "
+              >
+                ✎
+              </button>
+
+              <div
+                className="
+                  mx-auto mb-5 h-28 w-28
+                  rounded-3xl border border-purple-300/20
+                  bg-gradient-to-br from-purple-300/30 to-purple-900/30
+                  shadow-[0_0_24px_rgba(192,132,252,0.18)]
+                "
+              />
+
+              <h2
+                id="activity-title"
+                className="mb-7 text-center text-3xl font-bold text-white"
+              >
                 {selectedActivity.name}
               </h2>
 
-              <div className="mt-6">
-                <p className="mb-2 font-semibold text-purple-950">Tags</p>
+              <div className="mb-7">
+                <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-purple-300">
+                  Tags
+                </p>
 
-                <div className="mb-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {activityTags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="rounded-full bg-purple-950/15 px-3 py-1 text-sm text-purple-950"
+                      className="
+                        rounded-full border border-purple-300/20
+                        bg-purple-300/15 px-3 py-1
+                        text-sm text-purple-100
+                      "
                     >
                       {tag.name}
                     </span>
                   ))}
+
+                  {!showTagInput && (
+                    <button
+                      type="button"
+                      aria-label="Create a tag"
+                      onClick={() => setShowTagInput(true)}
+                      className="
+                        flex h-7 w-7 items-center justify-center
+                        rounded-full border border-dashed border-purple-300/40
+                        bg-white/5 text-lg leading-none text-purple-300
+                        transition
+                        hover:scale-105 hover:border-purple-300
+                        hover:bg-purple-300/15 hover:text-white
+                      "
+                    >
+                      +
+                    </button>
+                  )}
                 </div>
 
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    addTag();
-                  }}
-                  className="flex gap-2"
-                >
-                  <input
-                    type="text"
-                    value={tagName}
-                    onChange={(event) => setTagName(event.target.value)}
-                    placeholder="Add a tag"
-                    className="
-                      flex-1 rounded-full border border-purple-900/20
-                      bg-white/30 px-4 py-2
-                      text-purple-950 placeholder:text-purple-900/50
-                      outline-none
-                    "
-                  />
+                {showTagInput && (
+                  <form
+                    onSubmit={async (event) => {
+                      event.preventDefault();
 
-                  <button
-                    type="submit"
-                    className="
-                      rounded-full bg-purple-900/70
-                      px-4 py-2 text-white
-                    "
+                      if (!tagName.trim()) {
+                        return;
+                      }
+
+                      await addTag();
+                      setShowTagInput(false);
+                    }}
+                    className="mt-3 flex gap-2"
                   >
-                    +
-                  </button>
-                </form>
+                    <input
+                      type="text"
+                      value={tagName}
+                      onChange={(event) => setTagName(event.target.value)}
+                      placeholder="Tag name"
+                      autoFocus
+                      className="
+                        min-w-0 flex-1 rounded-full
+                        border border-purple-300/20 bg-white/10
+                        px-4 py-2 text-sm text-purple-100
+                        placeholder:text-purple-200/40
+                        outline-none transition
+                        focus:border-purple-300/50
+                        focus:ring-2 focus:ring-purple-400/20
+                      "
+                    />
+
+                    <button
+                      type="submit"
+                      className="
+                        rounded-full bg-purple-500/70
+                        px-4 py-2 text-sm font-medium text-white
+                        transition hover:bg-purple-500
+                      "
+                    >
+                      Add
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="Cancel creating tag"
+                      onClick={() => {
+                        setTagName("");
+                        setShowTagInput(false);
+                      }}
+                      className="
+                        rounded-full px-3 py-2
+                        text-sm text-purple-200/60
+                        transition hover:text-white
+                      "
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                )}
               </div>
 
-              <div className="space-y-4 text-purple-950">
-                <p>
-                  <span className="font-semibold">Location:</span>{" "}
+              <div
+                className="
+                  space-y-4 rounded-2xl
+                  border border-white/10 bg-white/5 p-5
+                  text-sm text-purple-100/85
+                "
+              >
+                <div>
+                  <p className="mb-1 font-semibold text-purple-300">Location</p>
 
                   {selectedActivity.location ? (
                     <a
@@ -742,31 +906,287 @@ export default function TripPage() {
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="underline transition hover:text-purple-600"
+                      className="
+                        underline decoration-purple-300/50
+                        underline-offset-4 transition
+                        hover:text-white hover:decoration-purple-300
+                      "
                     >
                       {selectedActivity.location}
                     </a>
                   ) : (
-                    "No location provided"
+                    <p className="text-purple-200/50">No location provided</p>
                   )}
-                </p>
+                </div>
 
-                <p>
-                  <span className="font-semibold">Price range:</span>{" "}
-                  {selectedActivity.priceRange}
-                </p>
+                <div>
+                  <p className="mb-1 font-semibold text-purple-300">Price range</p>
+                  <p>{selectedActivity.priceRange || "Not provided"}</p>
+                </div>
 
-                <p>
-                  <span className="font-semibold">Links:</span>{" "}
-                  {selectedActivity.links}
-                </p>
+                <div>
+                  <p className="mb-1 font-semibold text-purple-300">Links</p>
+                  <p className="break-words">
+                    {selectedActivity.links || "No links provided"}
+                  </p>
+                </div>
 
-                <p>
-                  <span className="font-semibold">Notes:</span>{" "}
-                  {selectedActivity.notes}
-                </p>
+                <div>
+                  <p className="mb-1 font-semibold text-purple-300">Notes</p>
+                  <p className="whitespace-pre-wrap">
+                    {selectedActivity.notes || "No notes provided"}
+                  </p>
+                </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {editActivity && (
+          <div
+            className="
+              fixed inset-0 z-50 flex items-center justify-center
+              bg-[#0d1020]/70 px-4 backdrop-blur-sm
+            "
+            onClick={() => setEditActivity(null)}
+          >
+            <form
+              onSubmit={updateActivity}
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-activity-title"
+              className="
+                relative max-h-[90vh] w-full max-w-lg overflow-y-auto
+                rounded-[2rem] border border-purple-300/20
+                bg-[#25283d]/85 p-8
+                text-purple-100
+                shadow-[0_0_50px_rgba(168,85,247,0.22)]
+                backdrop-blur-2xl
+              "
+            >
+              <button
+                type="button"
+                aria-label="Cancel editing"
+                onClick={() => setEditActivity(null)}
+                className="
+                  absolute right-5 top-4
+                  text-2xl text-purple-300/70
+                  transition hover:scale-110 hover:text-white
+                "
+              >
+                ×
+              </button>
+
+              <div
+                className="
+                  mx-auto mb-5 h-28 w-28
+                  rounded-3xl border border-purple-300/20
+                  bg-gradient-to-br from-purple-300/30 to-purple-900/30
+                  shadow-[0_0_24px_rgba(192,132,252,0.18)]
+                "
+              />
+
+              <div className="mb-7 text-center">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-purple-300/60">
+                  Edit activity
+                </p>
+
+                <input
+                  id="edit-activity-title"
+                  type="text"
+                  required
+                  autoFocus
+                  value={editActivity.name}
+                  onChange={(event) =>
+                    setEditActivity({
+                      ...editActivity,
+                      name: event.target.value,
+                    })
+                  }
+                  className="
+                    w-full border-b border-white/15
+                    bg-transparent pb-3 text-center
+                    text-3xl font-bold text-white
+                    outline-none transition
+                    focus:border-purple-300/60
+                  "
+                />
+              </div>
+
+              <div
+                className="
+                  space-y-5 rounded-2xl
+                  border border-white/10 bg-white/5 p-5
+                "
+              >
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-purple-300">
+                    Location
+                  </label>
+
+                  {editActivity.location && (
+                    <p className="mb-2 text-xs text-purple-100/60">
+                      Current: {editActivity.location}
+                    </p>
+                  )}
+
+                  <div
+                    className="
+                      rounded-xl border border-white/15
+                      bg-white/8 px-3 py-2
+                      transition
+                      focus-within:border-purple-300/50
+                      focus-within:ring-2 focus-within:ring-purple-300/10
+                    "
+                  >
+                    <APIProvider
+                      apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+                    >
+                      <LocationAutocomplete
+                        onPlaceSelected={(place) =>
+                          setEditActivity((currentActivity) =>
+                            currentActivity
+                              ? {
+                                  ...currentActivity,
+                                  location: place.address,
+                                  latitude: place.latitude,
+                                  longitude: place.longitude,
+                                }
+                              : null
+                          )
+                        }
+                      />
+                    </APIProvider>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-purple-300">
+                    Price range
+                  </p>
+
+                  <div className="flex gap-2">
+                    {["$", "$$", "$$$"].map((price) => (
+                      <button
+                        key={price}
+                        type="button"
+                        onClick={() =>
+                          setEditActivity({
+                            ...editActivity,
+                            priceRange: price,
+                          })
+                        }
+                        className={`
+                          rounded-full border px-4 py-1.5
+                          text-sm font-semibold transition
+                          ${
+                            editActivity.priceRange === price
+                              ? `
+                                border-purple-200/50
+                                bg-purple-300/30 text-white
+                                shadow-[0_0_14px_rgba(192,132,252,0.25)]
+                              `
+                              : `
+                                border-white/10
+                                bg-white/5 text-white/40
+                                hover:bg-white/10 hover:text-white/70
+                              `
+                          }
+                        `}
+                      >
+                        {price}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-purple-300">
+                    Links
+                  </label>
+
+                  <input
+                    type="text"
+                    value={editActivity.links ?? ""}
+                    onChange={(event) =>
+                      setEditActivity({
+                        ...editActivity,
+                        links: event.target.value,
+                      })
+                    }
+                    placeholder="Link 1, Link 2, Link 3"
+                    className="
+                      w-full rounded-xl border border-white/15
+                      bg-white/8 px-4 py-2.5 text-purple-100
+                      placeholder:text-purple-200/30
+                      outline-none transition
+                      focus:border-purple-300/50
+                      focus:ring-2 focus:ring-purple-300/10
+                    "
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-purple-300">
+                    Notes
+                  </label>
+
+                  <textarea
+                    value={editActivity.notes ?? ""}
+                    onChange={(event) =>
+                      setEditActivity({
+                        ...editActivity,
+                        notes: event.target.value,
+                      })
+                    }
+                    placeholder="Anything you want to remember..."
+                    rows={4}
+                    className="
+                      w-full resize-none rounded-xl
+                      border border-white/15 bg-white/8
+                      px-4 py-2.5 text-purple-100
+                      placeholder:text-purple-200/30
+                      outline-none transition
+                      focus:border-purple-300/50
+                      focus:ring-2 focus:ring-purple-300/10
+                    "
+                  />
+                </div>
+              </div>
+
+              <div className="mt-7 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditActivity(null)}
+                  className="
+                    flex-1 rounded-full border border-white/15
+                    bg-white/5 py-2.5
+                    font-medium text-purple-100/70
+                    transition hover:bg-white/10 hover:text-white
+                  "
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="
+                    flex-1 rounded-full
+                    border border-purple-200/30
+                    bg-purple-300/25 py-2.5
+                    font-semibold text-white
+                    shadow-[0_0_22px_rgba(192,132,252,0.2)]
+                    transition-all
+                    hover:-translate-y-0.5
+                    hover:bg-purple-300/35
+                    hover:shadow-[0_0_30px_rgba(192,132,252,0.35)]
+                  "
+                >
+                  Save changes
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </section>
