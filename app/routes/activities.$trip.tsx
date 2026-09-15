@@ -946,7 +946,7 @@ export default function TripPage() {
           <div
             className="
               fixed inset-0 z-50 flex items-center justify-center
-              bg-[#0d1020]/70 px-4 backdrop-blur-sm
+              bg-[#0d1020]/85 px-4
             "
             onClick={() => setEditActivity(null)}
           >
@@ -962,7 +962,7 @@ export default function TripPage() {
                 bg-[#25283d]/85 p-8
                 text-purple-100
                 shadow-[0_0_50px_rgba(168,85,247,0.22)]
-                backdrop-blur-2xl
+                backdrop-blur-none
               "
             >
               <button
