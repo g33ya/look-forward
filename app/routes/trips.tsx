@@ -35,13 +35,18 @@ export default function Trips() {
   }, []);
 
   // Load user's name for display
-  const [userName, setUserName] = useState("");
+  const [userName, setUserName] = useState<string | null>(null);
   useEffect(() => {
     async function getUserName() {
       const response = await fetch("http://localhost:8000/auth/me", { credentials: "include" });
+      if (!response.ok) {
+        setUserName("");
+        return;
+      }
+
       const user = await response.json();
 
-      setUserName(user["name"].split(" ")[0])
+      setUserName(user.name.split(" ")[0]);
     }
   getUserName()
   }, []);
@@ -84,6 +89,14 @@ export default function Trips() {
       { icon: <VscAdd size={15} />, label: 'create trip', onClick: () => setShowForm(true) },
       { icon: <VscArchive size={18}/>, label: 'view archive', onClick: () => alert('not implemented yet :3') },
   ];
+
+  if (userName === null) {
+    return (
+      <main className="trips-page flex min-h-screen items-center justify-center text-[#efe4e9]">
+        Loading trips...
+      </main>
+    );
+  }
 
   return (
     <main className="trips-page flex min-h-screen flex-col items-center justify-center pb-30">
