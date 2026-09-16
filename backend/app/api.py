@@ -112,8 +112,8 @@ async def google_login(data: dict, response: Response): # data is a dict from Go
                     key="session_token",
                     value=session_token,
                     httponly=True,
-                    secure=False,  
-                    samesite="lax",
+                    secure=True,  
+                    samesite="none",
                     max_age=7 * 24 * 60 * 60,
                 )
 
