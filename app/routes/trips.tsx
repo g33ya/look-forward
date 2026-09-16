@@ -111,7 +111,7 @@ export default function Trips() {
               {trip.image_url ? (
                 <>
                   <img
-                    src={`http://localhost:8000${trip.image_url}`}
+                    src={trip.image_url}
                     alt={trip.name}
                     className="absolute inset-0 h-full w-full object-cover"
                   />

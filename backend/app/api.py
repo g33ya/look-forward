@@ -24,6 +24,17 @@ from fastapi.staticfiles import StaticFiles
 from typing import Optional
 from pydantic import BaseModel
 
+from supabase import Client, create_client
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+    raise RuntimeError("Supabase environment variables are not set")
+
+supabase: Client = create_client(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY
+)
 app = FastAPI()
 
 origins = [
@@ -206,11 +217,6 @@ async def get_trip(trip_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Trip not found")
     return {"id": trip[0], "name": trip[1]}
 
-# gets path for upload directory
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 async def save_trip_image(image: UploadFile) -> str:
     extension = Path(image.filename or "").suffix.lower()
 
@@ -220,13 +226,19 @@ async def save_trip_image(image: UploadFile) -> str:
             detail="Unsupported image format",
         )
 
-    filename = f"{uuid4()}{extension}"
-    image_path = UPLOAD_DIR / filename
+    filename = f"trips/{uuid4()}{extension}"
 
     contents = await image.read()
-    image_path.write_bytes(contents)
 
-    return f"/uploads/{filename}"
+    supabase.storage.from_("images").upload(
+        path=filename,
+        file=contents,
+        file_options={
+            "content-type": image.content_type or "application/octet-stream"
+        },
+    )
+
+    return supabase.storage.from_("images").get_public_url(filename)
 
 # Add a new trip
 @app.post("/add_trip")
