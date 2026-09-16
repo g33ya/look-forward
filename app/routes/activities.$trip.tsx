@@ -37,7 +37,7 @@ export default function TripPage() {
   useEffect(() => {
       async function loadActivities() {
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/${trip}`,
+          `${import.meta.env.VITE_API_URL}/get_activities/${trip}`,
           { credentials: "include" }
         );
         const existingActivities = await response.json();
