@@ -39,7 +39,7 @@ app = FastAPI()
 
 origins = [
     "http://localhost:5173",
-    "localhost:5173"
+    "https://look-forward.gscozzaro2004.workers.dev",
 ]
 
 
