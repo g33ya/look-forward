@@ -25,7 +25,7 @@ export default function Trips() {
   // Load user's trip
   useEffect(() => {
     async function loadTrips() {
-      const response = await fetch("http://localhost:8000/get_trips", { credentials: "include" });
+      const response = await fetch( `${import.meta.env.VITE_API_URL}/get_trips`, { credentials: "include" });
       const existingTrips = await response.json();
 
       setTrips(existingTrips);
@@ -38,12 +38,7 @@ export default function Trips() {
   const [userName, setUserName] = useState<string | null>(null);
   useEffect(() => {
     async function getUserName() {
-      const response = await fetch("http://localhost:8000/auth/me", { credentials: "include" });
-      if (!response.ok) {
-        setUserName("");
-        return;
-      }
-
+      const response = await fetch( `${import.meta.env.VITE_API_URL}/auth/me`, { credentials: "include" });
       const user = await response.json();
 
       setUserName(user.name.split(" ")[0]);
@@ -63,7 +58,7 @@ export default function Trips() {
     if (tripImage) {
       formData.append("image", tripImage);
     }
-    const response = await fetch("http://localhost:8000/add_trip", {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/add_trip`, {
       method: "POST",
       credentials: "include",
       body: formData
@@ -124,7 +119,7 @@ export default function Trips() {
               {trip.image_url ? (
                 <>
                   <img
-                    src={`http://localhost:8000${trip.image_url}`}
+                    src={trip.image_url}
                     alt={trip.name}
                     className="absolute inset-0 h-full w-full object-cover"
                   />

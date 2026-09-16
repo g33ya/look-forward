@@ -37,7 +37,7 @@ export default function TripPage() {
   useEffect(() => {
       async function loadActivities() {
         const response = await fetch(
-          `http://localhost:8000/get_activities/${trip}`,
+          `${import.meta.env.VITE_API_URL}/get_activities/${trip}`,
           { credentials: "include" }
         );
         const existingActivities = await response.json();
@@ -61,7 +61,7 @@ export default function TripPage() {
 
     async function loadTags() {
       const response = await fetch(
-        `http://localhost:8000/get_tags/${selectedActivity!.id}`,
+       `${import.meta.env.VITE_API_URL}/get_tags/${selectedActivity!.id}`,
         { credentials: "include" }
       );
       const tags = await response.json();
@@ -111,7 +111,7 @@ export default function TripPage() {
   async function createActivity( event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const response = await fetch("http://localhost:8000/add_activity", {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/add_activity`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -167,7 +167,7 @@ export default function TripPage() {
   // Get a specific activity by ID to display UI details
   async function getActivity(id: number) {
     const response = await fetch(
-      `http://localhost:8000/get_activity/${id}`
+      `${import.meta.env.VITE_API_URL}/get_activity/${id}`
     );
 
     const activity = await response.json();
@@ -184,7 +184,7 @@ export default function TripPage() {
       return;
     }
 
-    const response = await fetch("http://localhost:8000/create_tag", {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/create_tag`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -240,7 +240,7 @@ export default function TripPage() {
   }
 
   const response = await fetch(
-    `http://localhost:8000/activities/${editActivity.id}`,
+    `${import.meta.env.VITE_API_URL}/activities/${editActivity.id}`,
     {
       method: "PATCH",
       credentials: "include",

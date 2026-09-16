@@ -32,7 +32,7 @@ export default function Landing() {
             width="150"
             onSuccess={async (response) => {
                 const result = await fetch(
-                "http://localhost:8000/auth/google",
+                `${import.meta.env.VITE_API_URL}/auth/google`,
                 {
                     method: "POST",
                     credentials: "include",

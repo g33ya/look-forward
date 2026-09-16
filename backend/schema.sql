@@ -1,8 +1,3 @@
-DROP TABLE trips CASCADE;
-DROP TABLE activities CASCADE;
-DROP TABLE users CASCADE;
-DROP TABLE sessions CASCADE;
-
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     google_id TEXT UNIQUE NOT NULL,
@@ -22,21 +17,23 @@ CREATE TABLE sessions (
 CREATE TABLE trips (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL
-    image_url TEXT;
+    name VARCHAR(255) NOT NULL,
+    image_url TEXT
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE activities (
     id SERIAL PRIMARY KEY,
-    trip_id INT REFERENCES trips(id) ON DELETE CASCADE,
+    trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     location VARCHAR(255) NOT NULL,
     latitude DOUBLE PRECISION,
-    longitude DOUBLE PRECISION;
+    longitude DOUBLE PRECISION,
     price_range VARCHAR(255) CHECK (price_range IN ('$', '$$', '$$$')),
     links VARCHAR(2048),
     notes TEXT
-)
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 CREATE TABLE tags (
     id SERIAL PRIMARY KEY,
@@ -62,12 +59,3 @@ CREATE TABLE activity_tags (
         both activity 1/2 share tag 4
     */
 );
-
-
-SELECT * FROM activities
-WHERE trip_id=40;
-
-DELETE FROM activities
-WHERE trip_id = 40;
-
-SELECT * FROM trips
